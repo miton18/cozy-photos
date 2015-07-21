@@ -9,7 +9,7 @@ module.exports = class MapView extends BaseView
 
     initialize: (options) ->
         super
-        @listenTo @collection, 'reset change',  @addAllMarkers
+        @listenTo @collection, 'reset change add remove',  @addAllMarkers
         @markers = new L.MarkerClusterGroup
             disableClusteringAtZoom:    17
             removeOutsideVisibleBounds: false
@@ -17,7 +17,6 @@ module.exports = class MapView extends BaseView
 
     events: ->
         'click #validate': 'validateChange'
-
 
     afterRender: ->
         #define leaflet images folder
@@ -78,6 +77,21 @@ module.exports = class MapView extends BaseView
             propertyLoc: ['lat','lon']
             markerLocation: true
 
+        that = this
+        $(document).on "click", ".move", ()->
+            key = $(this).attr('data-key')
+            photo = that.collection.get key
+            console.log photo
+            photo?.save gps:
+                lat: null
+                lng: null
+                alt: null
+            , success: (e)=>
+                e.preventDefault()
+            , error: (e)=>
+                e.preventDefault()
+            that.showAll()
+
     addAllMarkers: ->
 
         @collection.hasGPS().each (photo) =>
@@ -88,9 +102,9 @@ module.exports = class MapView extends BaseView
             imgPath  = "photos/thumbs/#{photo.get('id')}.jpg"
             text     = '<img src="images/spinner.svg" width="150" height="150"/>'
             button   = '<button data-key="' + photo.get('id') +
-                '" class="btn btn-block">' +
+                '" class="btn btn-block move">' +
                 '<span class="glyphicon gliphicon-move"></span>' +
-                'Relocaliser</button>'
+                t('Delocaliser la photo') + '</button>'
 
             tempMarker = L.marker position,
                 title: photo.get 'title'
@@ -118,7 +132,9 @@ module.exports = class MapView extends BaseView
         @refresh()
 
     showAll: ->
-        @map.addLayer @markers
+        #@map.eachLayer (layer)=>
+        #    @map.removeLayer layer
+        @map.addLayer    @markers
 
     dispChoiceBox: ->
 
@@ -133,15 +149,12 @@ module.exports = class MapView extends BaseView
                 imgPath + '" data-key="' + photo.get('id') + '"' +\
                 '" style="height: 130px; display: inline"/>'
 
-    $(document).on "click", ".map-setter", ()->
-        $(this).toggleClass 'map-photo-checked'
-
     #Set new GPS coordinate to the photo
     validateChange: (e)->
-        console.log e
-        that = this
 
+        that = this
         $(".map-photo-checked").each ()->
+
             el = $ this
             photo = that.collection.get el.attr('data-key')
             that.standbyLatlng.lng += 0.0001
@@ -149,13 +162,12 @@ module.exports = class MapView extends BaseView
                 lat:    that.standbyLatlng.lat
                 long:   that.standbyLatlng.lng
                 alt:    0
-
             , success: (e)=>
                 e.preventDefault()
-
             , error: (e)=>
                 e.preventDefault()
         that.hide()
+        @showAll()
 
     # Hide cursor and bottom box
     hide: ->
@@ -165,4 +177,6 @@ module.exports = class MapView extends BaseView
     refresh: ->
         @map.invalidateSize() # force to load all map tiles
 
-
+    #check photos pn bottom box
+    $(document).on "click", ".map-setter", ()->
+        $(this).toggleClass 'map-photo-checked'
